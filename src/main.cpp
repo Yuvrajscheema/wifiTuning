@@ -18,7 +18,6 @@ void examplePIDTask(void *arg) {
     float local_kD = kD;
     float local_kI = kI;
     xSemaphoreGive(pidMutex);
-
     vTaskDelay(pdMS_TO_TICKS(10));
   }
 }
@@ -92,6 +91,13 @@ const char html[] PROGMEM = R"rawliteral(
     }
   </style>
   <script>
+  function updateValues() {
+    const form = document.getElementById('pidForm');
+    document.getElementById('currentKp').innerText = parseFloat(form.kp.value).toFixed(2);
+    document.getElementById('currentKi').innerText = parseFloat(form.ki.value).toFixed(2);
+    document.getElementById('currentKd').innerText = parseFloat(form.kd.value).toFixed(2);
+    }
+
     
     function showSuccess() {
       const formData = new FormData(document.getElementById('pidForm'));
@@ -153,7 +159,6 @@ const char html[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
-
 void handleRoot() {
   String page = FPSTR(html);
   page.replace("%KP%", String(kP, 2));
@@ -175,15 +180,11 @@ void handleSet() {
 }
 
 void wifiTask(void *arg) {
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to wifi . . .");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(" . ");
-  }
-  Serial.println("\n Connected");
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(ssid, password);
+  IPAddress IP = WiFi.softAPIP();
   Serial.print("IP adress: ");
-  Serial.println(WiFi.localIP());
+  Serial.println(IP);
 
   server.on("/", handleRoot);
   server.on("/set", handleSet);
@@ -192,7 +193,7 @@ void wifiTask(void *arg) {
 
   for (;;) {
     server.handleClient();
-    vTaskDelay(pdMS_TO_TICKS(500));
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
