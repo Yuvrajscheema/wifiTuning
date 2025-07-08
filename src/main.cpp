@@ -1,8 +1,8 @@
-#include <WiFi.h>
 #include <WebServer.h>
+#include <WiFi.h>
 
-const char* ssid = "ESP32_PID_Controller";
-const char* password = "12345678";
+const char *ssid = "ESP32_PID_Controller";
+const char *password = "12345678";
 
 WebServer server(80);
 
@@ -38,6 +38,17 @@ const char htmlPage[] PROGMEM = R"rawliteral(
     input[type="number"] { width: 80px; padding: 5px; }
     button { padding: 8px 16px; background: #007bff; color: white; border: none; cursor: pointer; }
     button:hover { background: #0056b3; }
+  .legend {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #333;
+}
+.legend div {
+  margin: 5px 0;
+  display: flex;
+  align-items: center;
+}
+
   </style>
 </head>
 <body>
@@ -60,14 +71,20 @@ const char htmlPage[] PROGMEM = R"rawliteral(
   <h3>Live Graph</h3>
   <canvas id="chart" width="800" height="400"></canvas>
 
+<div class="legend">
+  <div><span style="display:inline-block;width:20px;height:3px;background:#007bff;margin-right:5px;"></span>Current Position</div>
+  <div><span style="display:inline-block;width:20px;height:3px;background:#dc3545;margin-right:5px;"></span>Target Position</div>
+  <div><span style="display:inline-block;width:8px;height:8px;background:#ffc107;border-radius:50%;display:inline-block;margin-right:5px;"></span>Target Change</div>
+</div>
+
+
   <script>
-    // Simple chart implementation without external dependencies
     const canvas = document.getElementById('chart');
     const ctx = canvas.getContext('2d');
     
     let dataPoints = [];
     let targetChangePoints = []; // Store points where target changed
-    let maxDataPoints = 50;
+    let maxDataPoints = 100;
     let time = 0;
     
     function drawChart() {
@@ -75,11 +92,9 @@ const char htmlPage[] PROGMEM = R"rawliteral(
       
       if (dataPoints.length === 0) return;
       
-      // Find min/max values for scaling
       let minVal = Math.min(...dataPoints.map(d => Math.min(d.current, d.target)));
       let maxVal = Math.max(...dataPoints.map(d => Math.max(d.current, d.target)));
       
-      // Add some padding
       const padding = (maxVal - minVal) * 0.1;
       minVal -= padding;
       maxVal += padding;
@@ -94,7 +109,6 @@ const char htmlPage[] PROGMEM = R"rawliteral(
       const chartX = 60;
       const chartY = 20;
       
-      // Draw axes
       ctx.strokeStyle = '#ccc';
       ctx.beginPath();
       ctx.moveTo(chartX, chartY);
@@ -102,7 +116,6 @@ const char htmlPage[] PROGMEM = R"rawliteral(
       ctx.lineTo(chartX + chartWidth, chartY + chartHeight);
       ctx.stroke();
       
-      // Draw grid lines
       ctx.strokeStyle = '#eee';
       for (let i = 0; i <= 10; i++) {
         const y = chartY + (chartHeight / 10) * i;
@@ -112,7 +125,6 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         ctx.stroke();
       }
       
-      // Draw target change vertical lines first (behind the data lines)
       targetChangePoints.forEach(point => {
         if (point.index < dataPoints.length) {
           const x = chartX + (chartWidth / (maxDataPoints - 1)) * point.index;
@@ -125,13 +137,11 @@ const char htmlPage[] PROGMEM = R"rawliteral(
           ctx.stroke();
           ctx.setLineDash([]);
           
-          // Add target change marker
           ctx.fillStyle = '#ffc107';
           ctx.beginPath();
           ctx.arc(x, chartY + chartHeight + 15, 4, 0, 2 * Math.PI);
           ctx.fill();
           
-          // Add target value text
           ctx.fillStyle = '#333';
           ctx.font = '10px Arial';
           ctx.textAlign = 'center';
@@ -139,9 +149,7 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         }
       });
       
-      // Draw data
       if (dataPoints.length > 1) {
-        // Draw current position line (blue)
         ctx.strokeStyle = '#007bff';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -156,7 +164,6 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         }
         ctx.stroke();
         
-        // Draw target position line (red, dashed)
         ctx.strokeStyle = '#dc3545';
         ctx.lineWidth = 2;
         ctx.setLineDash([5, 5]);
@@ -173,13 +180,11 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         ctx.stroke();
         ctx.setLineDash([]);
         
-        // Draw target change points as circles
         targetChangePoints.forEach(point => {
           if (point.index < dataPoints.length) {
             const x = chartX + (chartWidth / (maxDataPoints - 1)) * point.index;
             const y = chartY + chartHeight - ((point.value - minVal) / (maxVal - minVal)) * chartHeight;
             
-            // Draw circle marker
             ctx.fillStyle = '#ffc107';
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
@@ -191,19 +196,16 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         });
       }
       
-      // Draw labels
       ctx.fillStyle = '#333';
       ctx.font = '12px Arial';
       ctx.textAlign = 'right';
       
-      // Y-axis labels
       for (let i = 0; i <= 5; i++) {
         const value = minVal + (maxVal - minVal) * (5 - i) / 5;
         const y = chartY + (chartHeight / 5) * i;
         ctx.fillText(value.toFixed(1), chartX - 10, y + 4);
       }
       
-      // Legend
       ctx.fillStyle = '#007bff';
       ctx.fillRect(chartX + chartWidth - 180, chartY + 10, 20, 3);
       ctx.fillStyle = '#333';
@@ -226,14 +228,12 @@ const char htmlPage[] PROGMEM = R"rawliteral(
     function updateChart(current, target, targetChangedFlag) {
       if (dataPoints.length >= maxDataPoints) {
         dataPoints.shift();
-        // Adjust target change indices
         targetChangePoints = targetChangePoints.map(point => ({
           ...point,
           index: point.index - 1
         })).filter(point => point.index >= 0);
       }
       
-      // Check if target changed
       if (targetChangedFlag && dataPoints.length > 0) {
         targetChangePoints.push({
           index: dataPoints.length,
@@ -280,7 +280,6 @@ const char htmlPage[] PROGMEM = R"rawliteral(
         });
     }
 
-    // Start updating when page loads
     window.addEventListener('load', function() {
       drawChart(); // Draw initial empty chart
       setInterval(update, 200);
@@ -304,67 +303,46 @@ void wifiTask(void *pvParameters) {
 }
 
 void controlTask(void *pvParameters) {
-  while (true) {
-    unsigned long now = millis();
-    float dt = (now - lastPIDTime) / 1000.0;
-    if (dt >= 0.02) {
-      // Check if target changed
-      if (targetPosition != previousTargetPosition) {
-        targetChanged = true;
-        previousTargetPosition = targetPosition;
-        integral = 0; // Reset integral on target change to prevent windup
-      }
-      
-      float error = targetPosition - currentPosition;
-      integral += error * dt;
-      float derivative = (error - previousError) / dt;
+  for (;;) {
 
-      float output = Kp * error + Ki * integral + Kd * derivative;
-
-      // Simulate some system response (replace with actual motor control)
-      currentPosition += constrain(output, -1.0, 1.0) * dt;
-
-      previousError = error;
-      lastPIDTime = now;
-    }
     vTaskDelay(pdMS_TO_TICKS(1));
   }
 }
 
-void handleRoot() {
-  server.send_P(200, "text/html", htmlPage);
-}
+void handleRoot() { server.send_P(200, "text/html", htmlPage); }
 
 void handleSetPID() {
-  if (server.hasArg("kp")) Kp = server.arg("kp").toFloat();
-  if (server.hasArg("ki")) Ki = server.arg("ki").toFloat();
-  if (server.hasArg("kd")) Kd = server.arg("kd").toFloat();
+  if (server.hasArg("kp"))
+    Kp = server.arg("kp").toFloat();
+  if (server.hasArg("ki"))
+    Ki = server.arg("ki").toFloat();
+  if (server.hasArg("kd"))
+    Kd = server.arg("kd").toFloat();
   server.send(200, "text/plain", "OK");
 }
 
 void handleSetTarget() {
-  if (server.hasArg("value")) targetPosition = server.arg("value").toFloat();
+  if (server.hasArg("value"))
+    targetPosition = server.arg("value").toFloat();
   server.send(200, "text/plain", "OK");
 }
 
 void handlePosition() {
-  String json = "{\"current\":" + String(currentPosition, 2)
-              + ",\"target\":" + String(targetPosition, 2)
-              + ",\"targetChanged\":" + (targetChanged ? "true" : "false") + "}";
-  
-  // Reset the flag after sending
+  String json = "{\"current\":" + String(currentPosition, 2) +
+                ",\"target\":" + String(targetPosition, 2) +
+                ",\"targetChanged\":" + (targetChanged ? "true" : "false") +
+                "}";
+
   targetChanged = false;
-  
+
   server.send(200, "application/json", json);
 }
 
 void setup() {
   Serial.begin(115200);
-  
-  // Set up Access Point
+
   WiFi.softAP(ssid, password);
-  
-  // Get the AP IP address
+
   IPAddress apIP = WiFi.softAPIP();
   Serial.println("Access Point Started");
   Serial.print("AP IP address: ");
@@ -372,26 +350,11 @@ void setup() {
   Serial.println("Connect to WiFi network: " + String(ssid));
   Serial.println("Then open browser to: http://" + apIP.toString());
 
-  xTaskCreatePinnedToCore(
-    wifiTask,
-    "WiFiTask",
-    4096,
-    NULL,
-    1,
-    &wifiTaskHandle,
-    0
-  );
+  xTaskCreatePinnedToCore(wifiTask, "WiFiTask", 4096, NULL, 1, &wifiTaskHandle,
+                          0);
 
-  xTaskCreatePinnedToCore(
-    controlTask,
-    "ControlTask",
-    4096,
-    NULL,
-    1,
-    &controlTaskHandle,
-    1
-  );
+  xTaskCreatePinnedToCore(controlTask, "ControlTask", 4096, NULL, 1,
+                          &controlTaskHandle, 1);
 }
 
-void loop() {
-}
+void loop() {}
